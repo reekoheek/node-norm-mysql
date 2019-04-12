@@ -4,6 +4,7 @@ const debug = require('debug')('node-norm-mysql:index');
 const debugQuery = require('debug')('node-norm-mysql:query');
 
 const OPERATORS = {
+  'ne': '!=',
   'eq': '=',
   'gt': '>',
   'lt': '<',
@@ -184,18 +185,50 @@ class Mysql extends Connection {
 
   getOr (query) {
     let wheres = [];
-    let data = [];
+    let datas = [];
     for (let i = 0; i < query.length; i++) {
+      if (Object.keys(query[i]).length > 1) {
+        let { where, data } = this.getAnd(query[i]);
+        wheres.push(where);
+        datas = datas.concat(data);
+        continue;
+      }
       let key = Object.keys(query[i])[0];
       let value = Object.values(query[i])[0];
       let [ field, operator = 'eq' ] = key.split('!');
       if (operator === 'like') {
         value = '%' + value + '%';
       }
+      datas.push(value);
+      wheres.push(`${mysql2.escapeId(field)} ${OPERATORS[operator]} ?`);
+    }
+    return { where: `(${wheres.join(' OR ')})`, data: datas };
+  }
+
+  getAnd (query) {
+    let wheres = [];
+    let data = [];
+    for (let key in query) {
+      let value = query[key];
+
+      if (key === '!or') {
+        let or = this.getOr(value);
+        wheres.push(or.where);
+        data = data.concat(or.data);
+        continue;
+      }
+
+      let [ field, operator = 'eq' ] = key.split('!');
+
+      // add by januar: for chek if operator like value change to %
+      if (operator === 'like') {
+        value = `%${value}%`;
+      }
+
       data.push(value);
       wheres.push(`${mysql2.escapeId(field)} ${OPERATORS[operator]} ?`);
     }
-    return { where: `(${wheres.join(' OR ')})`, data };
+    return { where: `(${wheres.join(' AND ')})`, data };
   }
 
   getWhere (query) {
