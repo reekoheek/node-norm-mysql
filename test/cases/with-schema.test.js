@@ -1,5 +1,4 @@
 const assert = require('assert');
-const mysql2 = require('mysql2/promise');
 const { Manager } = require('node-norm');
 const Big = require('big.js');
 const {
@@ -13,12 +12,7 @@ const {
   NString,
 } = require('node-norm/schemas');
 
-const config = {
-  adapter: require('..'),
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_DATABASE || 'testing',
+const config = require('../lib/config')({
   schemas: [
     {
       name: 'foo',
@@ -34,15 +28,8 @@ const config = {
       ],
     },
   ],
-};
-
-async function query (sql, params) {
-  let { host, user, password, database } = config;
-  let conn = await mysql2.createConnection({ host, user, password, database });
-  let [ results, fields ] = await conn.query(sql, params);
-  await conn.end();
-  return { results, fields };
-}
+});
+const query = require('../lib/query')(config);
 
 describe('cases with schema', () => {
   beforeEach(async () => {
@@ -77,7 +64,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
         '{"foo":"bar"}',
         'foobar',
         'custom-field',
-      ]
+      ],
     );
   });
 
@@ -86,11 +73,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   });
 
   it('create new record', async () => {
-    let manager = new Manager({ connections: [ config ] });
+    const manager = new Manager({ connections: [config] });
 
     try {
       await manager.runSession(async session => {
-        let { affected, rows } = await session.factory('foo')
+        const { affected, rows } = await session.factory('foo')
           .insert({
             nbig: 12.34,
             nboolean: '',
@@ -108,7 +95,29 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
         assert.strictEqual(rows.length, 1);
       });
 
-      let { results } = await query('SELECT * from foo');
+      const { results } = await query('SELECT * from foo');
+      assert.strictEqual(results.length, 2);
+    } finally {
+      await manager.end();
+    }
+  });
+
+  it('create new record with default empty columns', async () => {
+    const manager = new Manager({ connections: [config] });
+
+    try {
+      await manager.runSession(async session => {
+        const { affected, rows } = await session.factory('foo')
+          .insert({
+            nbig: 12.34,
+          })
+          .save();
+
+        assert.strictEqual(affected, 1);
+        assert.strictEqual(rows.length, 1);
+      });
+
+      const { results } = await query('SELECT * from foo');
       assert.strictEqual(results.length, 2);
     } finally {
       await manager.end();
@@ -116,10 +125,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   });
 
   it('read record', async () => {
-    let manager = new Manager({ connections: [ config ] });
+    const manager = new Manager({ connections: [config] });
     try {
       await manager.runSession(async session => {
-        let foos = await session.factory('foo').all();
+        const foos = await session.factory('foo').all();
         assert.strictEqual(foos.length, 1);
         assert(foos[0].nbig instanceof Big);
         assert.strictEqual(foos[0].nboolean, true);
@@ -136,10 +145,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   });
 
   it('update record', async () => {
-    let manager = new Manager({ connections: [ config ] });
+    const manager = new Manager({ connections: [config] });
     try {
       await manager.runSession(async session => {
-        let { affected } = await session.factory('foo', 1).set({
+        const { affected } = await session.factory('foo', 1).set({
           nbig: 12.34,
           nboolean: false,
           ndatetime: new Date('2018-11-21 00:00:00'),
@@ -153,7 +162,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
         assert.strictEqual(affected, 1);
       });
 
-      let { results } = await query('SELECT * FROM foo WHERE id = 1');
+      const { results } = await query('SELECT * FROM foo WHERE id = 1');
       assert.strictEqual(results.length, 1);
       assert.strictEqual(results[0].nbig, '12.34');
       assert.strictEqual(results[0].nboolean, 0);
