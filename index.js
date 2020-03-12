@@ -33,7 +33,7 @@ class Mysql extends Connection {
   getRaw () {
     if (!this.connPromise) {
       const { host, user, password, database } = this;
-      this.connPromise = mysql2.createConnection({ host, user, password, database });
+      this.connPromise = mysql2.createConnection({ host, user, password, database, enableKeepAlive: true });
       this.connPromise.then(conn => conn.on('error', this.dbOnError.bind(this)));
     }
 
@@ -47,7 +47,8 @@ class Mysql extends Connection {
     // lost due to either server restart
     if (err.code === 'PROTOCOL_CONNECTION_LOST') {
       this.connPromise = undefined;
-      throw new Error('Connection already ended');
+      console.error('Connection already ended, will be reinstantiate for next query');
+      return;
     }
 
     throw err;
