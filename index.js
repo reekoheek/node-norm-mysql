@@ -25,7 +25,7 @@ class Mysql extends Connection {
   }
 
   getConnection () {
-    debug('Deprecated #getConnection(), use #getRaw() instead');
+    console.warn('Deprecated #getConnection(), use #getRaw() instead');
 
     return this.getRaw();
   }
@@ -55,7 +55,7 @@ class Mysql extends Connection {
   }
 
   dbQuery (sql, params) {
-    debug('Deprecated #dbQuery(), use #rawQuery() instead');
+    console.warn('Deprecated #dbQuery(), use #rawQuery() instead');
 
     return this.rawQuery(sql, params);
   }
@@ -284,7 +284,7 @@ class Mysql extends Connection {
   }
 
   async count (query, useSkipAndLimit = false) {
-    const sqlArr = [`SELECT count(*) AS ${mysql2.escapeId('count')} FROM ${mysql2.escapeId(query.schema.name)}`];
+    const sqlArr = [`SELECT * FROM ${mysql2.escapeId(query.schema.name)}`];
     const [wheres, data] = this.getWhere(query);
     if (wheres) {
       sqlArr.push(wheres);
@@ -293,15 +293,14 @@ class Mysql extends Connection {
     if (useSkipAndLimit) {
       if (query.length >= 0) {
         sqlArr.push(`LIMIT ${query.length}`);
+      }
 
-        if (query.offset > 0) {
-          sqlArr.push(`OFFSET ${query.offset}`);
-        }
+      if (query.offset > 0) {
+        sqlArr.push(`OFFSET ${query.offset}`);
       }
     }
 
-    const sql = sqlArr.join(' ');
-
+    const sql = `SELECT COUNT(*) AS ${mysql2.escapeId('count')} FROM (${sqlArr.join(' ')}) AS a`;
     const { result: [row] } = await this.rawQuery(sql, data);
     return row.count;
   }
