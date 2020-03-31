@@ -68,9 +68,9 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
     );
   });
 
-  afterEach(async () => {
-    await query('DROP TABLE foo');
-  });
+  // afterEach(async () => {
+  //   await query('DROP TABLE foo');
+  // });
 
   it('create new record', async () => {
     const manager = new Manager({ connections: [config] });
@@ -81,7 +81,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
           .insert({
             nbig: 12.34,
             nboolean: '',
-            ndatetime: new Date(),
+            ndatetime: new Date('2019-02-06T00:00:00.000Z'),
             ndouble: 1.234,
             ninteger: 1234,
             nlist: ['foo', 'bar'],

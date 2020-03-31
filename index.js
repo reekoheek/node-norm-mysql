@@ -13,6 +13,21 @@ const OPERATORS = {
   like: 'like',
 };
 
+const DEFAULT_TYPES = {
+  nstring: 'VARCHAR(255)',
+  nreference: 'VARCHAR(255)',
+  ninteger: 'INT',
+  ndouble: 'DOUBLE',
+  ndatetime: 'DATETIME',
+  nboolean: 'TINYINT',
+  nlist: 'TEXT',
+  nmap: 'TEXT',
+  ntext: 'TEXT',
+  nbig: 'DECIMAL(25,8)',
+};
+
+const FALLBACK_TYPE = 'VARCHAR(255)';
+
 class Mysql extends Connection {
   constructor (options) {
     super(options);
@@ -331,6 +346,51 @@ class Mysql extends Connection {
 
     return value;
   }
+
+  async defined ({ name }) {
+    try {
+      await this.rawQuery(`SELECT 1 FROM ${mysql2.escapeId(name)} LIMIT 1`);
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  async define ({ name, fields }) {
+    const fieldLines = fields.map(field => {
+      const overridden = field.get('mysql.ddl.override');
+      if (overridden) {
+        return `${mysql2.escapeId(field.name)} ${overridden.trim()}`;
+      }
+
+      const schemaType = field.constructor.name.toLowerCase();
+      const dataType = field.get('mysql.ddl.type') || DEFAULT_TYPES[schemaType] || FALLBACK_TYPE;
+      const lineTokens = [`${mysql2.escapeId(field.name)} ${dataType}`];
+      lineTokens.push(`${getFilter(field, 'required') ? 'NOT NULL' : 'NULL'}`);
+      if (getFilter(field, 'unique')) {
+        lineTokens.push('UNIQUE');
+      }
+      return lineTokens.join(' ').trim();
+    });
+
+    fieldLines.unshift(`${mysql2.escapeId('id')} INT PRIMARY KEY AUTO_INCREMENT`);
+
+    const sql = `
+CREATE TABLE ${mysql2.escapeId(name)} (
+  ${fieldLines.join(',\n  ')}
+)
+    `.trim();
+
+    await this.rawQuery(sql);
+  }
+
+  async undefine ({ name }) {
+    await this.rawQuery(`DROP TABLE ${mysql2.escapeId(name)}`);
+  }
 }
 
 module.exports = Mysql;
+
+function getFilter (field, name) {
+  return field.rawFilters.find(f => f[0] === name);
+}
