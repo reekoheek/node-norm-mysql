@@ -39,10 +39,14 @@ class Mysql extends Connection {
     this.database = database;
   }
 
-  getConnection () {
-    console.warn('Deprecated #getConnection(), use #getRaw() instead');
-
-    return this.getRaw();
+  async _specialQuery (sql, params) {
+    const { host, user, password, database } = this;
+    const conn = await mysql2.createConnection({ host, user, password, database });
+    try {
+      return conn.query(sql, params);
+    } finally {
+      await conn.end();
+    }
   }
 
   getRaw () {
@@ -55,6 +59,7 @@ class Mysql extends Connection {
     return this.connPromise;
   }
 
+  /* istanbul ignore next */
   dbOnError (err) {
     debug('Database error', err);
 
@@ -69,17 +74,10 @@ class Mysql extends Connection {
     throw err;
   }
 
-  dbQuery (sql, params) {
-    console.warn('Deprecated #dbQuery(), use #rawQuery() instead');
-
-    return this.rawQuery(sql, params);
-  }
-
   async rawQuery (sql, params) {
-    if (debugQuery.enabled) {
-      debugQuery('SQL %s', sql);
-      debugQuery('??? %o', params);
-    }
+    debugQuery('SQL %s', sql);
+    debugQuery('??? %o', params);
+
     const conn = await this.getRaw();
     const [result, fields] = await conn.execute(sql, params);
     return { result, fields };
@@ -100,7 +98,7 @@ class Mysql extends Connection {
     return fieldNames;
   }
 
-  async insert (query, callback = () => {}) {
+  async insert (query, callback) {
     const fieldNames = this.getFieldNamesFromSchemaOrRow(query);
 
     const placeholder = fieldNames.map(f => '?').join(', ');
@@ -125,7 +123,7 @@ class Mysql extends Connection {
     return changes;
   }
 
-  async load (query, callback = () => {}) {
+  async load (query, callback) {
     const sqlArr = [`SELECT * FROM ${mysql2.escapeId(query.schema.name)}`];
     const [wheres, data] = this.getWhere(query);
     if (wheres) {
@@ -158,7 +156,7 @@ class Mysql extends Connection {
     });
   }
 
-  async delete (query, callback) {
+  async delete (query) {
     const [wheres, data] = this.getWhere(query);
     const sqlArr = [`DELETE FROM ${mysql2.escapeId(query.schema.name)}`];
     if (wheres) {
@@ -168,6 +166,10 @@ class Mysql extends Connection {
     const sql = sqlArr.join(' ');
 
     await this.rawQuery(sql, data);
+  }
+
+  async truncate (query) {
+    await this._specialQuery(`TRUNCATE TABLE ${mysql2.escapeId(query.schema.name)}`);
   }
 
   getOrderBy (query) {
@@ -349,7 +351,7 @@ class Mysql extends Connection {
 
   async defined ({ name }) {
     try {
-      await this.rawQuery(`SELECT 1 FROM ${mysql2.escapeId(name)} LIMIT 1`);
+      await this._specialQuery(`SELECT 1 FROM ${mysql2.escapeId(name)} LIMIT 1`);
       return true;
     } catch (err) {
       return false;
@@ -381,11 +383,11 @@ CREATE TABLE ${mysql2.escapeId(name)} (
 )
     `.trim();
 
-    await this.rawQuery(sql);
+    await this._specialQuery(sql);
   }
 
   async undefine ({ name }) {
-    await this.rawQuery(`DROP TABLE ${mysql2.escapeId(name)}`);
+    await this._specialQuery(`DROP TABLE ${mysql2.escapeId(name)}`);
   }
 }
 

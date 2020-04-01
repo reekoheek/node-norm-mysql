@@ -1,8 +1,6 @@
 const assert = require('assert');
-const { Manager } = require('node-norm');
-
-const config = require('../lib/config')();
-const query = require('../lib/query')(config);
+const query = require('../_lib/query')();
+const createManager = require('../_lib/manager');
 
 describe('complex query', () => {
   beforeEach(async () => {
@@ -27,7 +25,7 @@ describe('complex query', () => {
   });
 
   it('!or only', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
 
     try {
       await manager.runSession(async session => {
@@ -47,7 +45,7 @@ describe('complex query', () => {
   });
 
   it('complex query or and', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
 
     try {
       await manager.runSession(async session => {
@@ -66,7 +64,7 @@ describe('complex query', () => {
   });
 
   it('complex query or with normal query and', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
 
     try {
       await manager.runSession(async session => {

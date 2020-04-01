@@ -1,5 +1,6 @@
 const assert = require('assert');
-const { Manager } = require('node-norm');
+const query = require('../_lib/query')();
+const createManager = require('../_lib/manager');
 const Big = require('big.js');
 const {
   NBig,
@@ -12,47 +13,42 @@ const {
   NString,
 } = require('node-norm/schemas');
 
-const config = require('../lib/config')({
-  schemas: [
-    {
-      name: 'foo',
-      fields: [
-        new NBig('nbig'),
-        new NBoolean('nboolean'),
-        new NDatetime('ndatetime'),
-        new NDouble('ndouble'),
-        new NInteger('ninteger'),
-        new NList('nlist'),
-        new NMap('nmap'),
-        new NString('nstring'),
-      ],
-    },
+const SCHEMAS = [{
+  name: 'foo',
+  fields: [
+    new NBig('nbig'),
+    new NBoolean('nboolean'),
+    new NDatetime('ndatetime'),
+    new NDouble('ndouble'),
+    new NInteger('ninteger'),
+    new NList('nlist'),
+    new NMap('nmap'),
+    new NString('nstring'),
   ],
-});
-const query = require('../lib/query')(config);
+}];
 
 describe('cases with schema', () => {
   beforeEach(async () => {
     await query('DROP TABLE IF EXISTS foo');
     await query(`
-CREATE TABLE foo (
-  id INT AUTO_INCREMENT,
-  nbig VARCHAR(100),
-  nboolean INT,
-  ndatetime DATETIME,
-  ndouble DOUBLE,
-  ninteger INT,
-  nlist TEXT,
-  nmap TEXT,
-  nstring VARCHAR(100),
-  nfield VARCHAR(100),
-  PRIMARY KEY (id)
-)
+      CREATE TABLE foo (
+        id INT AUTO_INCREMENT,
+        nbig VARCHAR(100),
+        nboolean INT,
+        ndatetime DATETIME,
+        ndouble DOUBLE,
+        ninteger INT,
+        nlist TEXT,
+        nmap TEXT,
+        nstring VARCHAR(100),
+        nfield VARCHAR(100),
+        PRIMARY KEY (id)
+      )
     `);
     await query(
       `
-INSERT INTO foo (nbig, nboolean, ndatetime, ndouble, ninteger, nlist, nmap, nstring, nfield)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
+        INSERT INTO foo (nbig, nboolean, ndatetime, ndouble, ninteger, nlist, nmap, nstring, nfield)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
       `,
       [
         '123.456',
@@ -73,7 +69,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   // });
 
   it('create new record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager({ schemas: SCHEMAS });
 
     try {
       await manager.runSession(async session => {
@@ -103,7 +99,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   });
 
   it('create new record with default empty columns', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager({ schemas: SCHEMAS });
 
     try {
       await manager.runSession(async session => {
@@ -125,7 +121,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   });
 
   it('read record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager({ schemas: SCHEMAS });
     try {
       await manager.runSession(async session => {
         const foos = await session.factory('foo').all();
@@ -145,7 +141,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ? )
   });
 
   it('update record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager({ schemas: SCHEMAS });
     try {
       await manager.runSession(async session => {
         const { affected } = await session.factory('foo', 1).set({

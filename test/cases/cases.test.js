@@ -1,8 +1,6 @@
 const assert = require('assert');
-const { Manager } = require('node-norm');
-
-const config = require('../lib/config')();
-const query = require('../lib/query')(config);
+const query = require('../_lib/query')();
+const createManager = require('../_lib/manager');
 
 describe('cases', () => {
   beforeEach(async () => {
@@ -25,7 +23,7 @@ describe('cases', () => {
   });
 
   it('create new record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
 
     try {
       await manager.runSession(async session => {
@@ -44,8 +42,36 @@ describe('cases', () => {
     }
   });
 
+  it('rollback if error', async () => {
+    const manager = createManager();
+
+    try {
+      try {
+        await manager.runSession(async session => {
+          const { affected, rows } = await session.factory('foo')
+            .insert({ foo: 'bar' })
+            .save();
+
+          assert.strictEqual(affected, 1);
+          assert.strictEqual(rows.length, 1);
+
+          throw new Error('Ouch');
+        });
+      } catch (err) {
+        if (err.message !== 'Ouch') {
+          throw err;
+        }
+      }
+
+      const { results } = await query('SELECT * from foo');
+      assert.strictEqual(results.length, 6);
+    } finally {
+      await manager.end();
+    }
+  });
+
   it('read record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         const foos = await session.factory('foo').all();
@@ -57,7 +83,7 @@ describe('cases', () => {
   });
 
   it('update record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         const { affected } = await session.factory('foo', 2).set({ foo: 'bar' }).save();
@@ -73,7 +99,7 @@ describe('cases', () => {
   });
 
   it('delete record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         await session.factory('foo').delete();
@@ -87,7 +113,7 @@ describe('cases', () => {
   });
 
   it('count record', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         const count = await session.factory('foo').count();
@@ -99,7 +125,7 @@ describe('cases', () => {
   });
 
   it('check limit and offset', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         const data = await session.factory('foo').limit(1).skip(3).all();
@@ -111,7 +137,7 @@ describe('cases', () => {
   });
 
   it('check  offset without limit', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         const data = await session.factory('foo').skip(3).all();
@@ -122,7 +148,7 @@ describe('cases', () => {
     }
   });
   it('check  without offset without limit', async () => {
-    const manager = new Manager({ connections: [config] });
+    const manager = createManager();
     try {
       await manager.runSession(async session => {
         const data = await session.factory('foo').all();
