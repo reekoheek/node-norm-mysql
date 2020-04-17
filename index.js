@@ -101,26 +101,32 @@ class Mysql extends Connection {
   async insert (query, callback) {
     const fieldNames = this.getFieldNamesFromSchemaOrRow(query);
 
-    const placeholder = fieldNames.map(f => '?').join(', ');
-    const sql = `INSERT INTO ${mysql2.escapeId(query.schema.name)}` +
-      ` (${fieldNames.map(f => mysql2.escapeId(f)).join(', ')})` +
-      ` VALUES (${placeholder})`;
+    const placeholder = `(${fieldNames.map(f => '?').join(', ')})`;
 
-    let changes = 0;
-    await Promise.all(query.rows.map(async row => {
-      const rowData = fieldNames.map(f => {
+    const placeholders = [];
+    const data = [];
+    query.rows.forEach(row => {
+      fieldNames.forEach(f => {
         const value = this.serialize(row[f]);
-        return value;
+        data.push(value);
       });
 
-      const { result } = await this.rawQuery(sql, rowData);
-      row.id = result.insertId;
-      changes += result.affectedRows;
+      placeholders.push(placeholder);
+    });
 
+    const sql = `INSERT INTO ${mysql2.escapeId(query.schema.name)}` +
+      ` (${fieldNames.map(f => mysql2.escapeId(f)).join(', ')})` +
+      ` VALUES ${placeholders.join(', ')}`;
+
+    const { result } = await this.rawQuery(sql, data);
+    let insertId = result.insertId;
+
+    query.rows.forEach(row => {
+      row.id = insertId++;
       callback(row);
-    }));
+    });
 
-    return changes;
+    return result.affectedRows;
   }
 
   async load (query, callback) {
