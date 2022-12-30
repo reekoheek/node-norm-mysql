@@ -19,7 +19,7 @@
     "eslint-config-xinix": "^1.1.14",
     "husky": "^4.2.5",
     "lint-staged": "^10.1.3",
-    "mocha": "^7.1.1",
+    "mocha": "^10.2.0",
     "node-norm": "^1.4.4",
     "nyc": "^15.0.1"
   },
